@@ -24,7 +24,7 @@ tmp/
 .vscode/
 *.swp
 *.swo
-.idea/
+.idea/*
 
 
 *.nupkg

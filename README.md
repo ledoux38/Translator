@@ -20,7 +20,7 @@
 "BasePath": "~/workspace/synergee/synergee/front/src/assets/translation"
 }
 ```
-3. Install the required NuGet packages.
+3. Install the required NuGet packages. (nuget restore)
 
 ## Usage
 1. Add a translation in the `fr.json` file.
