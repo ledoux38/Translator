@@ -42,3 +42,9 @@ TestResults/
 *.[Cc]ache
 *.[Cc]achefile
 *.cachefile
+
+/.idea/.idea.translator/.idea/.name
+/.idea/.idea.translator/.idea/indexLayout.xml
+/.idea/.idea.translator/.idea/projectSettingsUpdater.xml
+/.idea/.idea.translator/.idea/vcs.xml
+/.idea/.idea.translator/.idea/workspace.xml
