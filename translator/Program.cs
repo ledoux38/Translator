@@ -6,13 +6,14 @@ namespace translator;
 
 class TranslationUpdater
 {
-    private static readonly HttpClient Client = new HttpClient();
+    private static readonly HttpClient Client = new();
     private static string? _deepLApiKey;
     private static string? _basePath;
 
-    public static async Task Main(string[] args)
+    public static async Task Main()
     {
         // Charger les configurations
+        Console.WriteLine("Chargement des configurations");
         IConfiguration configuration;
         try
         {
@@ -29,16 +30,30 @@ class TranslationUpdater
         _deepLApiKey = configuration["DeepLApiKey"] ?? throw new InvalidOperationException();
         _basePath = configuration["BasePath"] ?? throw new InvalidOperationException();
 
+        _basePath = ResolvePath(_basePath);
         string[] languages = { "en", "de", "es", "it", "nl", "pt" };
         var baseJson = LoadJson(Path.Combine(_basePath, "fr.json"));
 
         foreach (var lang in languages)
         {
+            Console.WriteLine($"Ecriture dans le fichier {lang}.json");
             var targetJson = LoadJson(Path.Combine(_basePath, $"{lang}.json"));
             await ProcessJson(baseJson, targetJson, lang);
+            Console.WriteLine($"Sauvegarde du fichier");
             SaveJson(Path.Combine(_basePath, $"{lang}.json"), targetJson);
         }
     }
+    
+    private static string ResolvePath(string path)
+    {
+        if (path.StartsWith("~/"))
+        {
+            var homeDirectory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            path = Path.Combine(homeDirectory, path.Substring(2).Replace("/", Path.DirectorySeparatorChar.ToString()));
+        }
+        return path;
+    }
+    
 
     private static JObject LoadJson(string filePath)
     {
