@@ -4,15 +4,14 @@ using Newtonsoft.Json.Linq;
 
 namespace translator;
 
-class TranslationUpdater
+public class TranslationUpdater
 {
-    private static readonly HttpClient Client = new();
-    private static string? _deepLApiKey;
-    private static string? _basePath;
+    private readonly HttpClient _client;
+    private readonly string _deepLApiKey;
+    private readonly string _basePath;
 
     public static async Task Main()
     {
-        // Charger les configurations
         Console.WriteLine("Chargement des configurations");
         IConfiguration configuration;
         try
@@ -27,47 +26,66 @@ class TranslationUpdater
             Console.WriteLine($"Erreur lors de la lecture du fichier de configuration : {ex.Message}");
             return;
         }
-        _deepLApiKey = configuration["DeepLApiKey"] ?? throw new InvalidOperationException();
-        _basePath = configuration["BasePath"] ?? throw new InvalidOperationException();
 
-        _basePath = ResolvePath(_basePath);
+        // Création de l'instance de TranslationUpdater avec les dépendances
+        var httpClient = new HttpClient();
+        var translationUpdater = new TranslationUpdater(httpClient, configuration);
+
+        Console.WriteLine("Mise à jour des traductions");
+        await translationUpdater.UpdateTranslations();
+
+        Console.WriteLine("Mise à jour terminée");
+    }
+    
+    public TranslationUpdater(HttpClient client, IConfiguration configuration)
+    {
+        _client = client;
+        _deepLApiKey = configuration["DeepLApiKey"] ??
+                       throw new InvalidOperationException("DeepL API key is missing.");
+        _basePath = ResolvePath(configuration["BasePath"] ??
+                                throw new InvalidOperationException("Base path is missing."));
+    }
+
+    public static string ResolvePath(string path)
+    {
+        if (path.StartsWith("~/"))
+        {
+            var homeDirectory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            path = Path.Combine(homeDirectory,
+                path.Substring(2).Replace("/", Path.DirectorySeparatorChar.ToString()));
+        }
+
+        return path;
+    }
+
+    public async Task UpdateTranslations()
+    {
         string[] languages = { "en", "de", "es", "it", "nl", "pt" };
         var baseJson = LoadJson(Path.Combine(_basePath, "fr.json"));
 
         foreach (var lang in languages)
         {
-            Console.WriteLine($"Ecriture dans le fichier {lang}.json");
             var targetJson = LoadJson(Path.Combine(_basePath, $"{lang}.json"));
             await ProcessJson(baseJson, targetJson, lang);
-            Console.WriteLine($"Sauvegarde du fichier");
             SaveJson(Path.Combine(_basePath, $"{lang}.json"), targetJson);
         }
     }
-    
-    private static string ResolvePath(string path)
-    {
-        if (path.StartsWith("~/"))
-        {
-            var homeDirectory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            path = Path.Combine(homeDirectory, path.Substring(2).Replace("/", Path.DirectorySeparatorChar.ToString()));
-        }
-        return path;
-    }
-    
 
-    private static JObject LoadJson(string filePath)
+    public static JObject LoadJson(string filePath)
     {
         var json = File.ReadAllText(filePath);
         return JObject.Parse(json);
     }
 
-    private static void SaveJson(string filePath, JObject jsonObject)
+    public static void SaveJson(string filePath, JObject jsonObject)
     {
         var json = JsonConvert.SerializeObject(jsonObject, Formatting.Indented);
         File.WriteAllText(filePath, json);
     }
 
-    private static async Task ProcessJson(JToken baseToken, JToken targetToken, string targetLanguage)
+
+
+    internal async Task ProcessJson(JToken baseToken, JToken targetToken, string targetLanguage)
     {
         switch (baseToken.Type)
         {
@@ -81,6 +99,7 @@ class TranslationUpdater
                         targetChild = new JObject();
                         ((JObject)targetToken).Add(child.Name, targetChild);
                     }
+
                     await ProcessJson(child.Value, targetChild, targetLanguage);
                 }
 
@@ -117,7 +136,7 @@ class TranslationUpdater
         }
     }
 
-    private static async Task<string> TranslateText(string text, string targetLanguage)
+    public async Task<string> TranslateText(string text, string targetLanguage)
     {
         var content = new FormUrlEncodedContent(new[]
         {
@@ -126,7 +145,7 @@ class TranslationUpdater
             new KeyValuePair<string, string?>("target_lang", targetLanguage.ToUpper())
         });
 
-        var response = await Client.PostAsync("https://api-free.deepl.com/v2/translate", content);
+        var response = await _client.PostAsync("https://api-free.deepl.com/v2/translate", content);
         response.EnsureSuccessStatusCode();
 
         var responseBody = await response.Content.ReadAsStringAsync();
