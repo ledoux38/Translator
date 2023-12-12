@@ -26,8 +26,7 @@ public class TranslationUpdater
             Console.WriteLine($"Erreur lors de la lecture du fichier de configuration : {ex.Message}");
             return;
         }
-
-        // Création de l'instance de TranslationUpdater avec les dépendances
+        
         var httpClient = new HttpClient();
         var translationUpdater = new TranslationUpdater(httpClient, configuration);
 
@@ -36,7 +35,7 @@ public class TranslationUpdater
 
         Console.WriteLine("Mise à jour terminée");
     }
-    
+
     public TranslationUpdater(HttpClient client, IConfiguration configuration)
     {
         _client = client;
@@ -82,7 +81,6 @@ public class TranslationUpdater
         var json = JsonConvert.SerializeObject(jsonObject, Formatting.Indented);
         File.WriteAllText(filePath, json);
     }
-
 
 
     internal async Task ProcessJson(JToken baseToken, JToken targetToken, string targetLanguage)
@@ -138,6 +136,9 @@ public class TranslationUpdater
 
     public async Task<string> TranslateText(string text, string targetLanguage)
     {
+        if (string.IsNullOrEmpty(text))
+            return "";
+
         var content = new FormUrlEncodedContent(new[]
         {
             new KeyValuePair<string, string?>("auth_key", _deepLApiKey),
