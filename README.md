@@ -12,7 +12,7 @@
 ```Shell 
    git clone git@github.com:ledoux38/Translator.git
    ```
-2. Create an appsettings.json file in the root directory of the program and add your DeepL API key:"
+2. Rename appsettings_sample.json to appsettings.json file in the root directory of the program and add your DeepL API key and path translation files:"
 
 ```Shell 
 {
