@@ -17,7 +17,7 @@
 ```Shell 
 {
 "DeepLApiKey": "xxxxx-xxx-xxxx-xxxx",
-"BasePath": "~/workspace/synergee/synergee/front/src/assets/translation"
+"BasePath": "~/workspace/xxxx/yyyyy/.../"
 }
 ```
 3. Install the required NuGet packages. (nuget restore)
