@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 
-# répertoire de base du script
-BASEDIR=$(dirname "$0")
+# Résout le chemin réel du lien symbolique
+REAL_PATH=$(readlink -f "$0")
+BASEDIR=$(dirname "$REAL_PATH")
 
 # Fonction appelée lors de l'interruption du script (CTRL+C)
 function ctrl_c() {
     echo "Interruption détectée. Arrêt..."
+    # Arrête tous les processus enfants du script courant
     pkill -P $$
 }
 
@@ -13,8 +15,8 @@ function ctrl_c() {
 trap ctrl_c INT
 
 echo "Démarrage du projet .NET..."
-# Lance le projet .NET en arrière-plan
-dotnet run --project ${BASEDIR}/translator.csproj &
+cd ${BASEDIR} # Change le répertoire de travail vers celui du script
+dotnet run --project ./translator.csproj &
 
 # Attend la fin de tous les processus en arrière-plan
 wait

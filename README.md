@@ -22,6 +22,13 @@
 ```
 3. Install the required NuGet packages. (nuget restore)
 
+4. add link
+   
+exemple
+```Shell
+sudo ln -s /home/ledoux/dev/Translator/translator/start.sh /usr/local/bin/translate
+```
+
 ## Usage
 1. Add a translation in the `fr.json` file.
 2. Run the Translator program.
