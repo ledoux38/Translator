@@ -28,7 +28,7 @@ exemple
 ```Shell
 sudo ln -s /home/ledoux/dev/Translator/translator/start.sh /usr/local/bin/translate
 ```
-
+now with the symbolic link you can now use the 'translate' command line to run the program
 ## Usage
 1. Add a translation in the `fr.json` file.
 2. Run the Translator program.
