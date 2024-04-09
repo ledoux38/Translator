@@ -17,16 +17,15 @@
 ```Shell 
 {
 "DeepLApiKey": "xxxxx-xxx-xxxx-xxxx",
-"BasePath": "~/workspace/xxxx/yyyyy/.../"
+"BasePath": "~/workspace/xxxx/yyyyy/.../translation"
 }
 ```
-3. Install the required NuGet packages. (nuget restore)
 
-4. add link
+3. add link
    
 exemple
 ```Shell
-sudo ln -s /home/ledoux/dev/Translator/translator/start.sh /usr/local/bin/translate
+sudo ln -s /home/user/.../translator/start.sh /usr/local/bin/translate
 ```
 now with the symbolic link you can now use the 'translate' command line to run the program
 ## Usage
