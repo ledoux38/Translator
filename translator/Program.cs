@@ -1,8 +1,7 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-
-namespace translator;
+namespace Translator;
 
 public class TranslationUpdater
 {
@@ -26,23 +25,29 @@ public class TranslationUpdater
             Console.WriteLine($"Erreur lors de la lecture du fichier de configuration : {ex.Message}");
             return;
         }
-        
+            
         var httpClient = new HttpClient();
         var translationUpdater = new TranslationUpdater(httpClient, configuration);
 
         Console.WriteLine("Mise à jour des traductions");
-        await translationUpdater.UpdateTranslations();
-
-        Console.WriteLine("Mise à jour terminée");
+        try
+        {
+            await translationUpdater.UpdateTranslations();
+            Console.WriteLine("Mise à jour terminée");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur lors de la mise à jour des traductions : {ex.Message}");
+        }
     }
 
     public TranslationUpdater(HttpClient client, IConfiguration configuration)
     {
         _client = client;
-        _deepLApiKey = configuration["DeepLApiKey"] ??
-                       throw new InvalidOperationException("DeepL API key is missing.");
-        _basePath = ResolvePath(configuration["BasePath"] ??
-                                throw new InvalidOperationException("Base path is missing."));
+        _deepLApiKey = configuration["DeepLApiKey"] 
+                       ?? throw new InvalidOperationException("DeepL API key is missing.");
+        _basePath = ResolvePath(configuration["BasePath"] 
+                                ?? throw new InvalidOperationException("Base path is missing."));
     }
 
     public static string ResolvePath(string path)
@@ -64,9 +69,11 @@ public class TranslationUpdater
 
         foreach (var lang in languages)
         {
-            var targetJson = LoadJson(Path.Combine(_basePath, $"{lang}.json"));
+            var langFilePath = Path.Combine(_basePath, $"{lang}.json");
+            EnsureFileExists(langFilePath);
+            var targetJson = LoadJson(langFilePath);
             await ProcessJson(baseJson, targetJson, lang);
-            SaveJson(Path.Combine(_basePath, $"{lang}.json"), targetJson);
+            SaveJson(langFilePath, targetJson);
         }
     }
 
@@ -82,13 +89,20 @@ public class TranslationUpdater
         File.WriteAllText(filePath, json);
     }
 
+    public static void EnsureFileExists(string filePath)
+    {
+        if (!File.Exists(filePath))
+        {
+            var emptyJson = new JObject();
+            SaveJson(filePath, emptyJson);
+        }
+    }
 
     internal async Task ProcessJson(JToken baseToken, JToken targetToken, string targetLanguage)
     {
         switch (baseToken.Type)
         {
             case JTokenType.Object:
-            {
                 foreach (var child in baseToken.Children<JProperty>())
                 {
                     var targetChild = targetToken[child.Name];
@@ -100,11 +114,9 @@ public class TranslationUpdater
 
                     await ProcessJson(child.Value, targetChild, targetLanguage);
                 }
-
                 break;
-            }
+
             case JTokenType.Array:
-            {
                 var baseArray = (JArray)baseToken;
                 var targetArray = targetToken as JArray ?? new JArray();
 
@@ -118,19 +130,15 @@ public class TranslationUpdater
                 {
                     targetToken.Replace(targetArray);
                 }
-
                 break;
-            }
+
             case JTokenType.String:
-            {
                 if (targetToken.Type != JTokenType.String || string.IsNullOrEmpty(targetToken.ToString()))
                 {
                     var translatedText = await TranslateText(baseToken.ToString(), targetLanguage);
                     targetToken.Replace(translatedText);
                 }
-
                 break;
-            }
         }
     }
 

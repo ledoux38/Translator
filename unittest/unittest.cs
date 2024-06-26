@@ -1,5 +1,5 @@
 using Newtonsoft.Json.Linq;
-using translator;
+using Translator;
 using static NUnit.Framework.Assert;
 
 namespace unittest;
