@@ -1,13 +1,15 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+
 namespace Translator;
 
-public class TranslationUpdater
+public class TranslationUpdater(HttpClient client, IConfiguration configuration)
 {
-    private readonly HttpClient _client;
-    private readonly string _deepLApiKey;
-    private readonly string _basePath;
+    private readonly string _deepLApiKey = configuration["DeepLApiKey"]
+                                           ?? throw new InvalidOperationException("DeepL API key is missing.");
+    private readonly string _basePath = ResolvePath(configuration["BasePath"]
+                                                    ?? throw new InvalidOperationException("Base path is missing."));
 
     public static async Task Main()
     {
@@ -25,14 +27,14 @@ public class TranslationUpdater
             Console.WriteLine($"Erreur lors de la lecture du fichier de configuration : {ex.Message}");
             return;
         }
-            
+
         var httpClient = new HttpClient();
         var translationUpdater = new TranslationUpdater(httpClient, configuration);
 
         Console.WriteLine("Mise à jour des traductions");
         try
         {
-            await translationUpdater.UpdateTranslations();
+            await translationUpdater.UpdateAllTranslations();
             Console.WriteLine("Mise à jour terminée");
         }
         catch (Exception ex)
@@ -41,16 +43,7 @@ public class TranslationUpdater
         }
     }
 
-    public TranslationUpdater(HttpClient client, IConfiguration configuration)
-    {
-        _client = client;
-        _deepLApiKey = configuration["DeepLApiKey"] 
-                       ?? throw new InvalidOperationException("DeepL API key is missing.");
-        _basePath = ResolvePath(configuration["BasePath"] 
-                                ?? throw new InvalidOperationException("Base path is missing."));
-    }
-
-    public static string ResolvePath(string path)
+    private static string ResolvePath(string path)
     {
         if (path.StartsWith("~/"))
         {
@@ -62,14 +55,67 @@ public class TranslationUpdater
         return path;
     }
 
-    public async Task UpdateTranslations()
+    private async Task UpdateAllTranslations()
     {
-        string[] languages = { "en", "de", "es", "it", "nl", "pt" };
-        var baseJson = LoadJson(Path.Combine(_basePath, "fr.json"));
+        var frFiles = GetFilesExcludingNodeModules(_basePath, "fr.json");
+
+        foreach (var frFile in frFiles)
+        {
+            var directoryPath = Path.GetDirectoryName(frFile);
+            if (!string.IsNullOrEmpty(directoryPath))
+            {
+                await UpdateTranslationsForDirectory(directoryPath);
+            }
+            else
+            {
+                Console.WriteLine($"Le répertoire parent de {frFile} est introuvable.");
+            }
+        }
+    }
+
+    private static List<string> GetFilesExcludingNodeModules(string rootPath, string searchPattern)
+    {
+        var files = new List<string>();
+        var directoriesToProcess = new Stack<string>();
+        directoriesToProcess.Push(rootPath);
+
+        while (directoriesToProcess.Count > 0)
+        {
+            var currentDirectory = directoriesToProcess.Pop();
+            try
+            {
+                foreach (var file in Directory.GetFiles(currentDirectory, searchPattern))
+                {
+                    files.Add(file);
+                }
+
+                foreach (var directory in Directory.GetDirectories(currentDirectory))
+                {
+                    if (Path.GetFileName(directory).Equals("node_modules", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    directoriesToProcess.Push(directory);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Erreur lors de la lecture du répertoire {currentDirectory}: {ex.Message}");
+            }
+        }
+
+        return files;
+    }
+
+    private async Task UpdateTranslationsForDirectory(string directoryPath)
+    {
+        string[] languages = ["en", "de", "es", "it", "nl", "pt"];
+        var baseJson = LoadJson(Path.Combine(directoryPath, "fr.json"));
 
         foreach (var lang in languages)
         {
-            var langFilePath = Path.Combine(_basePath, $"{lang}.json");
+            var langFilePath = Path.Combine(directoryPath, $"{lang}.json");
             EnsureFileExists(langFilePath);
             var targetJson = LoadJson(langFilePath);
             await ProcessJson(baseJson, targetJson, lang);
@@ -83,13 +129,13 @@ public class TranslationUpdater
         return JObject.Parse(json);
     }
 
-    public static void SaveJson(string filePath, JObject jsonObject)
+    private static void SaveJson(string filePath, JObject jsonObject)
     {
         var json = JsonConvert.SerializeObject(jsonObject, Formatting.Indented);
         File.WriteAllText(filePath, json);
     }
 
-    public static void EnsureFileExists(string filePath)
+    private static void EnsureFileExists(string filePath)
     {
         if (!File.Exists(filePath))
         {
@@ -98,7 +144,7 @@ public class TranslationUpdater
         }
     }
 
-    internal async Task ProcessJson(JToken baseToken, JToken targetToken, string targetLanguage)
+    private async Task ProcessJson(JToken baseToken, JToken targetToken, string targetLanguage)
     {
         switch (baseToken.Type)
         {
@@ -114,6 +160,7 @@ public class TranslationUpdater
 
                     await ProcessJson(child.Value, targetChild, targetLanguage);
                 }
+
                 break;
 
             case JTokenType.Array:
@@ -130,6 +177,7 @@ public class TranslationUpdater
                 {
                     targetToken.Replace(targetArray);
                 }
+
                 break;
 
             case JTokenType.String:
@@ -138,11 +186,12 @@ public class TranslationUpdater
                     var translatedText = await TranslateText(baseToken.ToString(), targetLanguage);
                     targetToken.Replace(translatedText);
                 }
+
                 break;
         }
     }
 
-    public async Task<string> TranslateText(string text, string targetLanguage)
+    private async Task<string> TranslateText(string text, string targetLanguage)
     {
         if (string.IsNullOrEmpty(text))
             return "";
@@ -154,7 +203,7 @@ public class TranslationUpdater
             new KeyValuePair<string, string?>("target_lang", targetLanguage.ToUpper())
         });
 
-        var response = await _client.PostAsync("https://api-free.deepl.com/v2/translate", content);
+        var response = await client.PostAsync("https://api-free.deepl.com/v2/translate", content);
         response.EnsureSuccessStatusCode();
 
         var responseBody = await response.Content.ReadAsStringAsync();
