@@ -3,24 +3,12 @@ using Newtonsoft.Json.Linq;
 
 namespace Translator
 {
-    public class TranslationUpdater
+    public class TranslationUpdater(HttpClient client, IConfiguration configuration)
+        : BaseService(client, configuration)
     {
-        private readonly HttpClient _client;
-        private readonly string _deepLApiKey;
-        private readonly string _basePath;
-
-        public TranslationUpdater(HttpClient client, IConfiguration configuration)
-        {
-            _client = client;
-            _deepLApiKey = configuration["DeepLApiKey"]
-                           ?? throw new InvalidOperationException("DeepL API key is missing.");
-            _basePath = PathResolver.ResolvePath(configuration["BasePath"]
-                                                 ?? throw new InvalidOperationException("Base path is missing."));
-        }
-
         public async Task UpdateAllTranslations()
         {
-            var frFiles = FileManager.GetFilesExcludingNodeModules(_basePath, "fr.json");
+            var frFiles = FileManager.GetFilesExcludingNodeModules(BasePath, "fr.json");
 
             foreach (var frFile in frFiles)
             {
@@ -39,10 +27,10 @@ namespace Translator
         private async Task UpdateTranslationsForDirectory(string directoryPath)
         {
             string[] languages = ["en", "de", "es", "it", "nl", "pt"];
-            
+
             var baseJson = FileManager.LoadJson(Path.Combine(directoryPath, "fr.json"));
             FileManager.SaveJson(Path.Combine(directoryPath, "fr.json"), FileManager.SortJsonKeys(baseJson));
-            
+
             foreach (var lang in languages)
             {
                 var langFilePath = Path.Combine(directoryPath, $"{lang}.json");
@@ -92,7 +80,7 @@ namespace Translator
                 case JTokenType.String:
                     if (targetToken.Type != JTokenType.String || string.IsNullOrEmpty(targetToken.ToString()))
                     {
-                        var translatedText = await TranslationService.TranslateText(_client, _deepLApiKey,
+                        var translatedText = await TranslationService.TranslateText(Client, DeepLApiKey,
                             baseToken.ToString(), targetLanguage);
                         targetToken.Replace(translatedText);
                     }

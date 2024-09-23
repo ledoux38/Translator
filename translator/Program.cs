@@ -2,9 +2,9 @@
 
 namespace Translator
 {
-    public class Program
+    public abstract class Program
     {
-        public static async Task Main()
+        public static async Task Main(string[] args)
         {
             Console.WriteLine("Chargement des configurations");
             IConfiguration configuration;
@@ -22,18 +22,53 @@ namespace Translator
             }
 
             var httpClient = new HttpClient();
-            var translationUpdater = new TranslationUpdater(httpClient, configuration);
-
-            Console.WriteLine("Mise à jour des traductions");
-            try
+            
+            if (args.Contains("--help") || args.Contains("-h"))
             {
-                await translationUpdater.UpdateAllTranslations();
-                Console.WriteLine("Mise à jour terminée");
+                ShowHelp();
             }
-            catch (Exception ex)
+            else if (args.Contains("--translate") || args.Contains("-t"))
             {
-                Console.WriteLine($"Erreur lors de la mise à jour des traductions : {ex.Message}");
+                var translationUpdater = new TranslationUpdater(httpClient, configuration);
+                Console.WriteLine("Mise à jour des traductions");
+                try
+                {
+                    await translationUpdater.UpdateAllTranslations();
+                    Console.WriteLine("Mise à jour terminée");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Erreur lors de la mise à jour des traductions : {ex.Message}");
+                }
             }
+            else if (args.Contains("--export") || args.Contains("-e"))
+            {
+                var importExportService = new ImportExportService(httpClient, configuration);
+                Console.WriteLine("Exportation des traductions en CSV");
+                try
+                {
+                    await importExportService.ExportTranslationsToCsv();
+                    Console.WriteLine("Exportation terminée");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Erreur lors de l'exportation des traductions : {ex.Message}");
+                }
+            }
+            else
+            {
+                Console.WriteLine(
+                    "Aucun argument valide fourni. Utilisez --translate/-t pour mettre à jour les traductions ou --export/-e pour exporter les traductions en CSV.");
+            }
+        }
+        
+        private static void ShowHelp()
+        {
+            Console.WriteLine("Usage: translator [options]");
+            Console.WriteLine("Options:");
+            Console.WriteLine("  -t, --translate   Mettre à jour toutes les traductions.");
+            Console.WriteLine("  -e, --export      Exporter toutes les traductions en CSV.");
+            Console.WriteLine("  -h, --help        Afficher l'aide.");
         }
     }
 }
