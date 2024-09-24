@@ -80,9 +80,18 @@ namespace Translator
                 case JTokenType.String:
                     if (targetToken.Type != JTokenType.String || string.IsNullOrEmpty(targetToken.ToString()))
                     {
-                        var translatedText = await TranslationService.TranslateText(Client, DeepLApiKey,
+                        
+                        if(bool.Parse(configuration["UseDeepLApi"]!)) 
+                        {
+                            var translatedText = await TranslationService.TranslateText(Client, DeepLApiKey,
                             baseToken.ToString(), targetLanguage);
-                        targetToken.Replace(translatedText);
+                            targetToken.Replace(translatedText);
+                        }
+                        else
+                        {
+                            targetToken.Replace("MISSING_TRANSLATION");
+                        }
+                        
                     }
 
                     break;
