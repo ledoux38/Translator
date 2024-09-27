@@ -7,12 +7,13 @@ public static class JsonFlattener
     public static JObject FlattenJson(JObject jsonObject)
     {
         var flattenedObject = new JObject();
-        var keyTracker = new HashSet<string>(); // Utiliser un HashSet pour suivre les clés uniques
-        FlattenJsonRecursively(jsonObject, flattenedObject, keyTracker, null);
+        var keyTracker = new HashSet<string>();
+        FlattenJsonRecursively(jsonObject, flattenedObject, keyTracker);
         return flattenedObject;
     }
 
-    private static void FlattenJsonRecursively(JToken token, JObject flattenedObject, HashSet<string> keyTracker, string prefix)
+    private static void FlattenJsonRecursively(JToken token, JObject flattenedObject, HashSet<string> keyTracker,
+        string? prefix = null)
     {
         if (token is JObject obj)
         {
@@ -24,7 +25,7 @@ public static class JsonFlattener
         }
         else if (token is JArray array)
         {
-            for (int i = 0; i < array.Count; i++)
+            for (var i = 0; i < array.Count; i++)
             {
                 var newPrefix = $"{prefix}[{i}]";
                 FlattenJsonRecursively(array[i], flattenedObject, keyTracker, newPrefix);
@@ -32,13 +33,13 @@ public static class JsonFlattener
         }
         else
         {
-            // Si le token est un JValue (chaîne, nombre, etc.), l'ajouter à l'objet aplati
-            if (keyTracker.Contains(prefix))
+            if (prefix != null && keyTracker.Contains(prefix))
             {
                 Console.WriteLine($"Clé en double détectée : {prefix}");
             }
             else
             {
+                if (prefix == null) return;
                 keyTracker.Add(prefix);
                 flattenedObject[prefix] = token;
             }

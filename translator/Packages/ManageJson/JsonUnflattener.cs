@@ -29,7 +29,8 @@ public static class JsonUnflattener
             {
                 // Handle array notation
                 var arrayKey = keyPart.Substring(0, keyPart.IndexOf('['));
-                var index = int.Parse(keyPart.Substring(keyPart.IndexOf('[') + 1, keyPart.IndexOf(']') - keyPart.IndexOf('[') - 1));
+                var index = int.Parse(keyPart.Substring(keyPart.IndexOf('[') + 1,
+                    keyPart.IndexOf(']') - keyPart.IndexOf('[') - 1));
 
                 if (!(currentObject[arrayKey] is JArray array))
                 {
@@ -39,7 +40,7 @@ public static class JsonUnflattener
 
                 while (array.Count <= index)
                 {
-                    array.Add(null);
+                    array.Add(null!);
                 }
 
                 if (i == keyParts.Length - 1)
@@ -48,11 +49,12 @@ public static class JsonUnflattener
                 }
                 else
                 {
-                    if (array[index] == null || !(array[index] is JObject))
+                    if (array[index] is not JObject)
                     {
                         array[index] = new JObject();
                     }
-                    currentObject = (JObject)array[index]!;
+
+                    currentObject = (JObject)array[index];
                 }
             }
             else
@@ -68,6 +70,7 @@ public static class JsonUnflattener
                         nestedObject = new JObject();
                         currentObject[keyPart] = nestedObject;
                     }
+
                     currentObject = nestedObject;
                 }
             }

@@ -30,8 +30,10 @@ namespace translator
             if (args.Contains("--help") || args.Contains("-h"))
             {
                 BaseService.ShowHelp();
+                return;
             }
-            else if (args.Contains("--translate") || args.Contains("-t"))
+
+            if (args.Contains("--translate") || args.Contains("-t"))
             {
                 var translationUpdater = new TranslationUpdater(httpClient, configuration);
                 Console.WriteLine("Mise à jour des traductions");
@@ -148,7 +150,8 @@ namespace translator
             else
             {
                 Console.WriteLine(
-                    "Aucun argument valide fourni. Utilisez --translate/-t pour mettre à jour les traductions ou --export/-e pour exporter les traductions en CSV.");
+                    "Aucun argument valide fourni.");
+                BaseService.ShowHelp();
             }
         }
     }

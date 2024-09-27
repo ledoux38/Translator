@@ -30,11 +30,10 @@ public static class JsonOrganizer
             }
             else if (parentObject[currentKey] is not JObject)
             {
-                // Si la clé existe mais n'est pas un JObject, on la remplace par un JObject
                 parentObject[currentKey] = new JObject();
             }
 
-            parentObject = (JObject)parentObject[currentKey];
+            parentObject = (JObject)parentObject[keyParts[i]]!;
         }
 
         var lastKey = keyParts.Last();

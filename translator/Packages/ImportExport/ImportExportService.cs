@@ -148,38 +148,38 @@ public class ImportExportService(HttpClient client, IConfiguration configuration
     {
         var result = new Dictionary<string, string>();
 
-        if (token is JObject obj)
+        switch (token)
         {
-            foreach (var property in obj.Properties())
+            case JObject obj:
             {
-                var newKey = string.IsNullOrEmpty(parentKey) ? property.Name : $"{parentKey}.{property.Name}";
-                foreach (var kvp in FlattenJson(property.Value, newKey))
+                foreach (var property in obj.Properties())
                 {
-                    if (!result.ContainsKey(kvp.Key))
+                    var newKey = string.IsNullOrEmpty(parentKey) ? property.Name : $"{parentKey}.{property.Name}";
+                    foreach (var kvp in FlattenJson(property.Value, newKey))
                     {
-                        result.Add(kvp.Key, kvp.Value);
-                    }
-                    else
-                    {
-                        Console.WriteLine(
-                            $"Conflit détecté pour la clé '{kvp.Key}'. Valeur existante : '{result[kvp.Key]}', Valeur en conflit : '{kvp.Value}'.(remplacement de la valeur existante)");
-                        result[kvp.Key] = kvp.Value;
+                        if (!result.ContainsKey(kvp.Key))
+                        {
+                            result.Add(kvp.Key, kvp.Value);
+                        }
+                        else
+                        {
+                            Console.WriteLine(
+                                $"Conflit détecté pour la clé '{kvp.Key}'. Valeur existante : '{result[kvp.Key]}', Valeur en conflit : '{kvp.Value}'.(remplacement de la valeur existante)");
+                            result[kvp.Key] = kvp.Value;
+                        }
                     }
                 }
+
+                break;
             }
-        }
-        else if (token is JValue value)
-        {
-            if (!result.ContainsKey(parentKey))
-            {
+            case JValue value when !result.ContainsKey(parentKey):
                 result.Add(parentKey, value.ToString(CultureInfo.InvariantCulture));
-            }
-            else
-            {
+                break;
+            case JValue value:
                 Console.WriteLine(
                     $"Conflit détecté pour la clé '{parentKey}'. Valeur existante : '{result[parentKey]}', Valeur en conflit : '{value}'. (remplacement de la valeur existante)");
                 result[parentKey] = value.ToString(CultureInfo.InvariantCulture);
-            }
+                break;
         }
 
         return result;
