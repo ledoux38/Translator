@@ -108,19 +108,6 @@ namespace translator
                     Console.WriteLine($"Erreur lors du tri des fichiers JSON : {ex.Message}");
                 }
             }
-            else if (args.Contains("--organize") || args.Contains("-o"))
-            {
-                Console.WriteLine("Réorganisation des clés dans les fichiers JSON");
-                try
-                {
-                    BaseService.OrganizeAllJsonFiles(configuration);
-                    Console.WriteLine("Réorganisation terminée");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Erreur lors de la réorganisation des fichiers JSON : {ex.Message}");
-                }
-            }
             else if (args.Contains("--flatten") || args.Contains("-f"))
             {
                 Console.WriteLine("Aplatissement des fichiers JSON");
