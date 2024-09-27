@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json.Linq;
-using Translator;
+using translator.Packages;
+using translator.Packages.ImportExport;
+using translator.Packages.Service;
 
 namespace unittest;
 
@@ -60,7 +62,7 @@ public class TranslationUpdaterTests
         });
 
 
-        await _importExportService.ExportTranslationsToCsv();
+        await _importExportService.ExportTranslationsToCsv(new List<string>());
 
 
         Assert.IsTrue(File.Exists(TestExportCsvPath));

@@ -1,14 +1,17 @@
 using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json.Linq;
+using translator.Packages.Service;
 
-namespace Translator
+namespace translator.Packages.Translate
 {
     public class TranslationUpdater(HttpClient client, IConfiguration configuration)
         : BaseService(client, configuration)
     {
-        public async Task UpdateAllTranslations()
+        private readonly IConfiguration _configuration = configuration;
+
+        public async Task UpdateAllTranslations(List<string> filesExcluded)
         {
-            var frFiles = FileManager.GetFilesExcludingNodeModules(BasePath, "fr.json");
+            var frFiles = FileManager.GetFilesExcludingNodeModules(BasePath, "fr.json", filesExcluded);
 
             foreach (var frFile in frFiles)
             {
@@ -81,7 +84,7 @@ namespace Translator
                     if (targetToken.Type != JTokenType.String || string.IsNullOrEmpty(targetToken.ToString()))
                     {
                         
-                        if(bool.Parse(configuration["UseDeepLApi"]!)) 
+                        if(bool.Parse(_configuration["UseDeepLApi"]!)) 
                         {
                             var translatedText = await TranslationService.TranslateText(Client, DeepLApiKey,
                             baseToken.ToString(), targetLanguage);

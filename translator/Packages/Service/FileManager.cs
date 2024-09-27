@@ -1,11 +1,11 @@
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-namespace Translator
+namespace translator.Packages.Service
 {
     public static class FileManager
     {
-        public static List<string> GetFilesExcludingNodeModules(string rootPath, string searchPattern)
+        public static List<string> GetFilesExcludingNodeModules(string rootPath, string searchPattern, List<string> excludedFiles)
         {
             var files = new List<string>();
             var directoriesToProcess = new Stack<string>();
@@ -18,12 +18,17 @@ namespace Translator
                 {
                     foreach (var file in Directory.GetFiles(currentDirectory, searchPattern))
                     {
-                        files.Add(file);
+                        // Exclusion des fichiers spécifiés
+                        if (!excludedFiles.Contains(Path.GetFileName(file)))
+                        {
+                            files.Add(file);
+                        }
                     }
 
                     foreach (var directory in Directory.GetDirectories(currentDirectory))
                     {
-                        if (Path.GetFileName(directory).Equals("node_modules", StringComparison.OrdinalIgnoreCase))
+                        if (Path.GetFileName(directory).Equals("node_modules", StringComparison.OrdinalIgnoreCase) || 
+                            Path.GetFileName(directory).Equals(".angular", StringComparison.OrdinalIgnoreCase))
                         {
                             continue;
                         }
@@ -39,6 +44,8 @@ namespace Translator
 
             return files;
         }
+
+
 
         public static JObject LoadJson(string filePath)
         {
@@ -60,7 +67,7 @@ namespace Translator
                 SaveJson(filePath, emptyJson);
             }
         }
-        
+
         public static JObject SortJsonKeys(JObject jsonObject)
         {
             var sortedJson = new JObject();

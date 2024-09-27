@@ -1,4 +1,4 @@
-namespace Translator
+namespace translator.Packages.Service
 {
     public static class PathResolver
     {

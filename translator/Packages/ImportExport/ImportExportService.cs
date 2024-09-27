@@ -2,8 +2,9 @@ using System.Globalization;
 using System.Text;
 using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json.Linq;
+using translator.Packages.Service;
 
-namespace Translator;
+namespace translator.Packages.ImportExport;
 
 public class ImportExportService(HttpClient client, IConfiguration configuration) : BaseService(client, configuration)
 {
@@ -20,9 +21,9 @@ public class ImportExportService(HttpClient client, IConfiguration configuration
                                                                          ?? throw new InvalidOperationException(
                                                                              "Base path is missing."));
 
-    public async Task ExportTranslationsToCsv()
+    public async Task ExportTranslationsToCsv(List<string> filesExcluded)
     {
-        var frFiles = FileManager.GetFilesExcludingNodeModules(BasePath, "fr.json");
+        var frFiles = FileManager.GetFilesExcludingNodeModules(BasePath, "fr.json", filesExcluded);
         var csvBuilder = new StringBuilder();
 
         csvBuilder.AppendLine(HeaderCsv);
@@ -89,6 +90,7 @@ public class ImportExportService(HttpClient client, IConfiguration configuration
         }
     }
 
+
     public async Task ImportTranslationsFromCsv(string csvFilePath)
     {
         if (!File.Exists(csvFilePath))
@@ -103,81 +105,83 @@ public class ImportExportService(HttpClient client, IConfiguration configuration
         foreach (var line in csvLines.Skip(1))
         {
             var columns = line.Split(Separator).Select(c => c.Trim('\"')).ToArray();
-            var filePath = columns[Array.IndexOf(headers, "FilePath")];
+            var directoryPath = columns[Array.IndexOf(headers, "FilePath")];
             var key = columns[Array.IndexOf(headers, "Key")];
 
-            try
+            for (int i = 2; i < headers.Length; i++) // skip FilePath and Key
             {
-                var translations = new Dictionary<string, string>();
-                foreach (var lang in headers.Skip(2))
+                var lang = headers[i];
+                var translation = columns[i];
+                translation = translation.Replace("\\\"", "\"");
+                
+                var langFilePath = Path.Combine(directoryPath, $"{lang}.json");
+
+                if (File.Exists(langFilePath))
                 {
-                    var translation = columns[Array.IndexOf(headers, lang)].Replace("\\n", "\n");
-                    if (!string.IsNullOrEmpty(translation))
+                    var langJson = FileManager.LoadJson(langFilePath);
+                    var flattenedJson = FlattenJson(langJson);
+
+                    if (flattenedJson.ContainsKey(key))
                     {
-                        translations[lang] = translation;
+                        flattenedJson[key] = translation;
+                        // Console.WriteLine($"Mise à jour de la clé '{key}' dans le fichier '{langFilePath}'.");
+                    }
+                    else
+                    {
+                        Console.WriteLine(
+                            $"Clé '{key}' non trouvée dans le fichier '{langFilePath}', Création de la clé");
+                        flattenedJson[key] = translation;
+                    }
+
+                    var updatedJson = JObject.FromObject(flattenedJson);
+                    FileManager.SaveJson(langFilePath, updatedJson);
+                }
+                else
+                {
+                    Console.WriteLine($"Le fichier JSON pour la langue {lang} n'existe pas: {langFilePath}");
+                }
+            }
+        }
+    }
+
+    private static Dictionary<string, string> FlattenJson(JToken token, string parentKey = "")
+    {
+        var result = new Dictionary<string, string>();
+
+        if (token is JObject obj)
+        {
+            foreach (var property in obj.Properties())
+            {
+                var newKey = string.IsNullOrEmpty(parentKey) ? property.Name : $"{parentKey}.{property.Name}";
+                foreach (var kvp in FlattenJson(property.Value, newKey))
+                {
+                    if (!result.ContainsKey(kvp.Key))
+                    {
+                        result.Add(kvp.Key, kvp.Value);
+                    }
+                    else
+                    {
+                        Console.WriteLine(
+                            $"Conflit détecté pour la clé '{kvp.Key}'. Valeur existante : '{result[kvp.Key]}', Valeur en conflit : '{kvp.Value}'.(remplacement de la valeur existante)");
+                        result[kvp.Key] = kvp.Value;
                     }
                 }
-
-                await UpdateJsonFileWithTranslations(filePath, key, translations);
             }
-            catch (Exception ex)
+        }
+        else if (token is JValue value)
+        {
+            if (!result.ContainsKey(parentKey))
+            {
+                result.Add(parentKey, value.ToString(CultureInfo.InvariantCulture));
+            }
+            else
             {
                 Console.WriteLine(
-                    $"Erreur lors de l'importation de la clé '{key}' dans le fichier '{filePath}': {ex.Message}");
+                    $"Conflit détecté pour la clé '{parentKey}'. Valeur existante : '{result[parentKey]}', Valeur en conflit : '{value}'. (remplacement de la valeur existante)");
+                result[parentKey] = value.ToString(CultureInfo.InvariantCulture);
             }
         }
-    }
 
-    private Task UpdateJsonFileWithTranslations(string filePath, string key,
-        Dictionary<string, string> translations)
-    {
-        var directoryPath = Path.GetDirectoryName(filePath);
-        if (string.IsNullOrEmpty(directoryPath))
-        {
-            Console.WriteLine($"Répertoire introuvable pour le fichier: {filePath}");
-            return Task.CompletedTask;
-        }
-
-        foreach (var lang in translations.Keys)
-        {
-            var langFilePath = Path.Combine(directoryPath, $"{lang}.json");
-            var langJson = FileManager.LoadJson(langFilePath);
-
-            SetJsonValue(langJson, key, translations[lang]);
-
-            FileManager.SaveJson(langFilePath, langJson);
-        }
-
-        return Task.CompletedTask;
-    }
-
-    private static void SetJsonValue(JToken jsonToken, string keyPath, string value)
-    {
-        var keyParts = keyPath.Split('.');
-        var currentToken = jsonToken;
-        for (var i = 0; i < keyParts.Length - 1; i++)
-        {
-            // Si la clé existe déjà et est un JValue, remplacez-la par un JObject
-            if (currentToken[keyParts[i]] is JValue)
-            {
-                currentToken[keyParts[i]] = new JObject();
-            }
-
-            // Si la clé n'existe pas, créez un nouveau JObject
-            if (currentToken[keyParts[i]] == null)
-            {
-                currentToken[keyParts[i]] = new JObject();
-            }
-
-            currentToken = currentToken[keyParts[i]];
-        }
-
-        // Vérifier si la dernière clé est un JValue et la remplacer ou lancer un avertissement
-        if (currentToken[keyParts.Last()] is JValue)
-        {
-            Console.WriteLine($"Remplacement de la clé '{keyPath}' qui était un JValue par une nouvelle valeur.");
-        }
-
-        currentToken[keyParts.Last()] = value;
+        return result;
     }
 }

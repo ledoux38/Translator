@@ -1,6 +1,9 @@
 ﻿using Microsoft.Extensions.Configuration;
+using translator.Packages.ImportExport;
+using translator.Packages.Service;
+using translator.Packages.Translate;
 
-namespace Translator
+namespace translator
 {
     public abstract class Program
     {
@@ -26,7 +29,7 @@ namespace Translator
 
             if (args.Contains("--help") || args.Contains("-h"))
             {
-                ShowHelp();
+                BaseService.ShowHelp();
             }
             else if (args.Contains("--translate") || args.Contains("-t"))
             {
@@ -34,7 +37,9 @@ namespace Translator
                 Console.WriteLine("Mise à jour des traductions");
                 try
                 {
-                    await translationUpdater.UpdateAllTranslations();
+                    var excludedFiles = configuration["ExcludedFiles"]?.Split(',').ToList() ??
+                                        Array.Empty<string>().ToList();
+                    await translationUpdater.UpdateAllTranslations(excludedFiles);
                     Console.WriteLine("Mise à jour terminée");
                 }
                 catch (Exception ex)
@@ -47,7 +52,9 @@ namespace Translator
                 Console.WriteLine("Exportation des traductions en CSV");
                 try
                 {
-                    await importExportService.ExportTranslationsToCsv();
+                    var excludedFiles = configuration["ExcludedFiles"]?.Split(',').ToList() ??
+                                        Array.Empty<string>().ToList();
+                    await importExportService.ExportTranslationsToCsv(excludedFiles);
                     Console.WriteLine("Exportation terminée");
                 }
                 catch (Exception ex)
@@ -57,10 +64,8 @@ namespace Translator
             }
             else if (args.Contains("--import") || args.Contains("-i"))
             {
-                // Trouver l'index de l'argument --name ou -n
                 var nameIndex = Array.FindIndex(args, a => a == "--name" || a == "-n");
 
-                // Vérifier si un chemin de fichier suit immédiatement l'argument --name ou -n
                 if (nameIndex >= 0 && nameIndex < args.Length - 1)
                 {
                     var csvFilePath = args[nameIndex + 1];
@@ -93,7 +98,7 @@ namespace Translator
                 Console.WriteLine("Tri des fichiers JSON");
                 try
                 {
-                    SortAllJsonFiles(configuration);
+                    BaseService.SortAllJsonFiles(configuration);
                     Console.WriteLine("Tri terminé");
                 }
                 catch (Exception ex)
@@ -101,37 +106,50 @@ namespace Translator
                     Console.WriteLine($"Erreur lors du tri des fichiers JSON : {ex.Message}");
                 }
             }
+            else if (args.Contains("--organize") || args.Contains("-o"))
+            {
+                Console.WriteLine("Réorganisation des clés dans les fichiers JSON");
+                try
+                {
+                    BaseService.OrganizeAllJsonFiles(configuration);
+                    Console.WriteLine("Réorganisation terminée");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Erreur lors de la réorganisation des fichiers JSON : {ex.Message}");
+                }
+            }
+            else if (args.Contains("--flatten") || args.Contains("-f"))
+            {
+                Console.WriteLine("Aplatissement des fichiers JSON");
+                try
+                {
+                    BaseService.FlattenAllJsonFiles(configuration);
+                    Console.WriteLine("Aplatissement terminé");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Erreur lors de l'aplatissement des fichiers JSON : {ex.Message}");
+                }
+            }
+            else if (args.Contains("--unflatten") || args.Contains("-uf"))
+            {
+                Console.WriteLine("Imbrication des clés des fichiers JSON");
+                try
+                {
+                    BaseService.UnflattenAllJsonFiles(configuration);
+                    Console.WriteLine("Imbrication terminée");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Erreur lors de l'imbrication des fichiers JSON : {ex.Message}");
+                }
+            }
             else
             {
                 Console.WriteLine(
                     "Aucun argument valide fourni. Utilisez --translate/-t pour mettre à jour les traductions ou --export/-e pour exporter les traductions en CSV.");
             }
-        }
-
-        private static void SortAllJsonFiles(IConfiguration configuration)
-        {
-            var basePath = PathResolver.ResolvePath(configuration["BasePath"] ?? Directory.GetCurrentDirectory());
-            var jsonFiles = FileManager.GetFilesExcludingNodeModules(basePath, "*.json");
-
-            foreach (var file in jsonFiles)
-            {
-                var jsonObject = FileManager.LoadJson(file);
-                var sortedJson = FileManager.SortJsonKeys(jsonObject);
-                FileManager.SaveJson(file, sortedJson);
-                Console.WriteLine($"Tri effectué pour le fichier : {file}");
-            }
-        }
-
-        private static void ShowHelp()
-        {
-            Console.WriteLine("Usage: translator [options]");
-            Console.WriteLine("Options:");
-            Console.WriteLine("  -t, --translate   Mettre à jour toutes les traductions.");
-            Console.WriteLine("  -e, --export      Exporter toutes les traductions en CSV.");
-            Console.WriteLine("  -i, --import      Importer les traductions depuis un fichier CSV.");
-            Console.WriteLine("  -n, --name        Nom du fichier CSV pour l'importation.");
-            Console.WriteLine("  -s, --sort        Trier toutes les clés dans les fichiers JSON.");
-            Console.WriteLine("  -h, --help        Afficher l'aide.");
         }
     }
 }

@@ -1,6 +1,6 @@
 using Newtonsoft.Json;
 
-namespace Translator
+namespace translator.Packages.Translate
 {
     public static class TranslationService
     {
