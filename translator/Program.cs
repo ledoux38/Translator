@@ -134,7 +134,7 @@ namespace translator
                     Console.WriteLine($"Erreur lors de l'aplatissement des fichiers JSON : {ex.Message}");
                 }
             }
-            else if (args.Contains("--unflatten") || args.Contains("-uf"))
+            else if (args.Contains("--unflatten") || args.Contains("-u"))
             {
                 Console.WriteLine("Imbrication des clés des fichiers JSON");
                 try

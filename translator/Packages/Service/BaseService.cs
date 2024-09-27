@@ -120,7 +120,7 @@ public class BaseService
             Console.WriteLine("  -s, --sort        Trier toutes les clés dans les fichiers JSON.");
             Console.WriteLine("  -o, --organize    Réorganiser toutes les clés dans les fichiers JSON pour les imbriquer correctement.");
             Console.WriteLine("  -f, --flatten     Aplatir toutes les clés dans les fichiers JSON.");
-            Console.WriteLine("  -uf, --unflatten  Réorganiser toutes les clés aplaties en structure imbriquée dans les fichiers JSON.");
+            Console.WriteLine("  -u, --unflatten   Réorganiser toutes les clés aplaties en structure imbriquée dans les fichiers JSON.");
             Console.WriteLine("  -h, --help        Afficher l'aide.");
         }
 }

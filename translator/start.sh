@@ -11,6 +11,8 @@ function ctrl_c() {
 trap ctrl_c INT
 
 cd ${BASEDIR} # Change le répertoire de travail vers celui du script
-dotnet run --project ./translator.csproj &
+
+# Passer tous les arguments à dotnet run
+dotnet run --project ./translator.csproj -- "$@" &
 
 wait
