@@ -46,7 +46,7 @@ public class ImportExportService(HttpClient client, IConfiguration configuration
 
             foreach (var key in translations.Keys)
             {
-                var line = new List<string> { frFile, key };
+                var line = new List<string> { directoryPath, key };
                 line.AddRange(Languages.Select(lang => translations[key].ContainsKey(lang)
                     ? translations[key][lang].Replace("\n", "\\n")
                     : MissingTranslation));
@@ -113,7 +113,7 @@ public class ImportExportService(HttpClient client, IConfiguration configuration
                 var lang = headers[i];
                 var translation = columns[i];
                 translation = translation.Replace("\\\"", "\"");
-                
+
                 var langFilePath = Path.Combine(directoryPath, $"{lang}.json");
 
                 if (File.Exists(langFilePath))
