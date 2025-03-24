@@ -59,6 +59,52 @@ public class ImportExportService(HttpClient client, IConfiguration configuration
         await File.WriteAllTextAsync(outputFilePath, csvBuilder.ToString());
     }
 
+
+    public async Task CheckMissingKeys(List<string> filesExcluded)
+    {
+        var frFiles = FileManager.GetFilesExcludingNodeModules(BasePath, "fr.json", filesExcluded);
+        var csvBuilder = new StringBuilder();
+        csvBuilder.AppendLine("FilePath,Key,MissingLanguages");
+
+        foreach (var frFile in frFiles)
+        {
+            var directoryPath = Path.GetDirectoryName(frFile);
+            if (string.IsNullOrEmpty(directoryPath)) continue;
+        
+            var translations = new Dictionary<string, HashSet<string>>();
+        
+            foreach (var lang in Languages)
+            {
+                var langFilePath = Path.Combine(directoryPath, $"{lang}.json");
+                FileManager.EnsureFileExists(langFilePath);
+                var langJson = FileManager.LoadJson(langFilePath);
+            
+                var jsonDict = (IDictionary<string, JToken?>)langJson;
+                foreach (var key in jsonDict.Keys)
+                {
+                    if (!translations.ContainsKey(key))
+                    {
+                        translations[key] = new HashSet<string>();
+                    }
+                    translations[key].Add(lang);
+                }
+            }
+        
+            foreach (var key in translations.Keys)
+            {
+                var missingLanguages = Languages.Where(lang => !translations[key].Contains(lang)).ToList();
+                if (missingLanguages.Any())
+                {
+                    var missingLangsStr = string.Join(";", missingLanguages);
+                    csvBuilder.AppendLine($"{directoryPath},{key},{missingLangsStr}");
+                }
+            }
+        }
+
+        var outputFilePath = Path.Combine(_importExportPath, "missing_translations.csv");
+        await File.WriteAllTextAsync(outputFilePath, csvBuilder.ToString());
+    }
+
     private void CollectTranslations(JToken token, Dictionary<string, Dictionary<string, string>> translations,
         string language, string currentKey = "")
     {
@@ -124,15 +170,7 @@ public class ImportExportService(HttpClient client, IConfiguration configuration
                     if (flattenedJson.ContainsKey(key))
                     {
                         flattenedJson[key] = translation;
-                        // Console.WriteLine($"Mise à jour de la clé '{key}' dans le fichier '{langFilePath}'.");
                     }
-                    else
-                    {
-                        Console.WriteLine(
-                            $"Clé '{key}' non trouvée dans le fichier '{langFilePath}', Création de la clé");
-                        flattenedJson[key] = translation;
-                    }
-
                     var updatedJson = JObject.FromObject(flattenedJson);
                     FileManager.SaveJson(langFilePath, updatedJson);
                 }

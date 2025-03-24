@@ -64,6 +64,22 @@ namespace translator
                     Console.WriteLine($"Erreur lors de l'exportation des traductions : {ex.Message}");
                 }
             }
+            else if (args.Contains("--compare") || args.Contains("-c"))
+            {
+                Console.WriteLine("compare file");
+                try
+                {
+                    var excludedFiles = configuration["ExcludedFiles"]?.Split(',').ToList() ??
+                                        Array.Empty<string>().ToList();
+                    await importExportService.CheckMissingKeys(excludedFiles);
+                    Console.WriteLine("compare complited");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Erreur lors de la comparaison des traductions : {ex.Message}");
+                }
+            }
+            
             else if (args.Contains("--import") || args.Contains("-i"))
             {
                 var nameIndex = Array.FindIndex(args, a => a == "--name" || a == "-n");
