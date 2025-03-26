@@ -60,51 +60,57 @@ public class ImportExportService(HttpClient client, IConfiguration configuration
     }
 
 
-    public async Task CheckMissingKeys(List<string> filesExcluded)
-    {
-        var frFiles = FileManager.GetFilesExcludingNodeModules(BasePath, "fr.json", filesExcluded);
-        var csvBuilder = new StringBuilder();
-        csvBuilder.AppendLine("FilePath,Key,MissingLanguages");
+public async Task CheckMissingKeys(List<string> filesExcluded)
+{
+    var frFiles = FileManager.GetFilesExcludingNodeModules(BasePath, "fr.json", filesExcluded);
+    var csvBuilder = new StringBuilder();
+    csvBuilder.AppendLine("FilePath,Key,FR_Value,MissingLanguages");
 
-        foreach (var frFile in frFiles)
+    foreach (var frFile in frFiles)
+    {
+        var directoryPath = Path.GetDirectoryName(frFile);
+        if (string.IsNullOrEmpty(directoryPath)) continue;
+        
+        var translations = new Dictionary<string, HashSet<string>>();
+        var frValues = new Dictionary<string, string>();
+        
+        foreach (var lang in Languages)
         {
-            var directoryPath = Path.GetDirectoryName(frFile);
-            if (string.IsNullOrEmpty(directoryPath)) continue;
-        
-            var translations = new Dictionary<string, HashSet<string>>();
-        
-            foreach (var lang in Languages)
-            {
-                var langFilePath = Path.Combine(directoryPath, $"{lang}.json");
-                FileManager.EnsureFileExists(langFilePath);
-                var langJson = FileManager.LoadJson(langFilePath);
+            var langFilePath = Path.Combine(directoryPath, $"{lang}.json");
+            FileManager.EnsureFileExists(langFilePath);
+            var langJson = FileManager.LoadJson(langFilePath);
             
-                var jsonDict = (IDictionary<string, JToken?>)langJson;
-                foreach (var key in jsonDict.Keys)
-                {
-                    if (!translations.ContainsKey(key))
-                    {
-                        translations[key] = new HashSet<string>();
-                    }
-                    translations[key].Add(lang);
-                }
-            }
-        
-            foreach (var key in translations.Keys)
+            var jsonDict = (IDictionary<string, JToken?>)langJson;
+            foreach (var key in jsonDict.Keys)
             {
-                var missingLanguages = Languages.Where(lang => !translations[key].Contains(lang)).ToList();
-                if (missingLanguages.Any())
+                if (!translations.ContainsKey(key))
                 {
-                    var missingLangsStr = string.Join(";", missingLanguages);
-                    csvBuilder.AppendLine($"{directoryPath},{key},{missingLangsStr}");
+                    translations[key] = new HashSet<string>();
+                }
+                translations[key].Add(lang);
+                
+                if (lang == "fr" && jsonDict[key] != null)
+                {
+                    frValues[key] = jsonDict[key].ToString();
                 }
             }
         }
-
-        var outputFilePath = Path.Combine(_importExportPath, "missing_translations.csv");
-        await File.WriteAllTextAsync(outputFilePath, csvBuilder.ToString());
+        
+        foreach (var key in translations.Keys)
+        {
+            var missingLanguages = Languages.Where(lang => !translations[key].Contains(lang)).ToList();
+            if (missingLanguages.Any())
+            {
+                var missingLangsStr = string.Join(";", missingLanguages);
+                var frValue = frValues.ContainsKey(key) ? frValues[key] : "MISSING_FR";
+                csvBuilder.AppendLine($"{directoryPath},{key},{frValue},{missingLangsStr}");
+            }
+        }
     }
 
+    var outputFilePath = Path.Combine(_importExportPath, "missing_translations.csv");
+    await File.WriteAllTextAsync(outputFilePath, csvBuilder.ToString());
+}
     private void CollectTranslations(JToken token, Dictionary<string, Dictionary<string, string>> translations,
         string language, string currentKey = "")
     {
