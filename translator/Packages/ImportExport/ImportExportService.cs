@@ -64,46 +64,58 @@ public async Task CheckMissingKeys(List<string> filesExcluded)
 {
     var frFiles = FileManager.GetFilesExcludingNodeModules(BasePath, "fr.json", filesExcluded);
     var csvBuilder = new StringBuilder();
-    csvBuilder.AppendLine("FilePath,Key,FR_Value,MissingLanguages");
+    csvBuilder.AppendLine($"FilePath{Separator}Key{Separator}FR_Value{Separator}MissingLanguages");
 
     foreach (var frFile in frFiles)
     {
         var directoryPath = Path.GetDirectoryName(frFile);
         if (string.IsNullOrEmpty(directoryPath)) continue;
-        
+
         var translations = new Dictionary<string, HashSet<string>>();
         var frValues = new Dictionary<string, string>();
-        
+
         foreach (var lang in Languages)
         {
             var langFilePath = Path.Combine(directoryPath, $"{lang}.json");
             FileManager.EnsureFileExists(langFilePath);
             var langJson = FileManager.LoadJson(langFilePath);
-            
+
             var jsonDict = (IDictionary<string, JToken?>)langJson;
+
             foreach (var key in jsonDict.Keys)
             {
-                if (!translations.ContainsKey(key))
+                var value = jsonDict[key]?.ToString()?.Trim();
+
+                // On considère que la valeur est valide si non null et non vide
+                if (!string.IsNullOrEmpty(value))
                 {
-                    translations[key] = new HashSet<string>();
-                }
-                translations[key].Add(lang);
-                
-                if (lang == "fr" && jsonDict[key] != null)
-                {
-                    frValues[key] = jsonDict[key].ToString();
+                    if (!translations.ContainsKey(key))
+                    {
+                        translations[key] = new HashSet<string>();
+                    }
+                    translations[key].Add(lang);
+
+                    if (lang == "fr")
+                    {
+                        frValues[key] = value;
+                    }
                 }
             }
         }
-        
-        foreach (var key in translations.Keys)
+
+        var allKeys = translations.Keys.Union(frValues.Keys).Distinct();
+
+        foreach (var key in allKeys)
         {
-            var missingLanguages = Languages.Where(lang => !translations[key].Contains(lang)).ToList();
+            var existingLangs = translations.ContainsKey(key) ? translations[key] : new HashSet<string>();
+            var missingLanguages = Languages.Where(lang => !existingLangs.Contains(lang)).ToList();
+
             if (missingLanguages.Any())
             {
                 var missingLangsStr = string.Join(";", missingLanguages);
                 var frValue = frValues.ContainsKey(key) ? frValues[key] : "MISSING_FR";
-                csvBuilder.AppendLine($"{directoryPath},{key},{frValue},{missingLangsStr}");
+                csvBuilder.AppendLine(string.Join(Separator, new[] { directoryPath, key, frValue, missingLangsStr }.Select(val => $"\"{val}\"")));
+
             }
         }
     }
@@ -111,6 +123,7 @@ public async Task CheckMissingKeys(List<string> filesExcluded)
     var outputFilePath = Path.Combine(_importExportPath, "missing_translations.csv");
     await File.WriteAllTextAsync(outputFilePath, csvBuilder.ToString());
 }
+
     private void CollectTranslations(JToken token, Dictionary<string, Dictionary<string, string>> translations,
         string language, string currentKey = "")
     {
