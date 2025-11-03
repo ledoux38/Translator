@@ -60,69 +60,70 @@ public class ImportExportService(HttpClient client, IConfiguration configuration
     }
 
 
-public async Task CheckMissingKeys(List<string> filesExcluded)
-{
-    var frFiles = FileManager.GetFilesExcludingNodeModules(BasePath, "fr.json", filesExcluded);
-    var csvBuilder = new StringBuilder();
-    csvBuilder.AppendLine($"FilePath{Separator}Key{Separator}FR_Value{Separator}MissingLanguages");
-
-    foreach (var frFile in frFiles)
+    public async Task CheckMissingKeys(List<string> filesExcluded)
     {
-        var directoryPath = Path.GetDirectoryName(frFile);
-        if (string.IsNullOrEmpty(directoryPath)) continue;
+        var frFiles = FileManager.GetFilesExcludingNodeModules(BasePath, "fr.json", filesExcluded);
+        var csvBuilder = new StringBuilder();
+        csvBuilder.AppendLine($"FilePath{Separator}Key{Separator}FR_Value{Separator}MissingLanguages");
 
-        var translations = new Dictionary<string, HashSet<string>>();
-        var frValues = new Dictionary<string, string>();
-
-        foreach (var lang in Languages)
+        foreach (var frFile in frFiles)
         {
-            var langFilePath = Path.Combine(directoryPath, $"{lang}.json");
-            FileManager.EnsureFileExists(langFilePath);
-            var langJson = FileManager.LoadJson(langFilePath);
+            var directoryPath = Path.GetDirectoryName(frFile);
+            if (string.IsNullOrEmpty(directoryPath)) continue;
 
-            var jsonDict = (IDictionary<string, JToken?>)langJson;
+            var translations = new Dictionary<string, HashSet<string>>();
+            var frValues = new Dictionary<string, string>();
 
-            foreach (var key in jsonDict.Keys)
+            foreach (var lang in Languages)
             {
-                var value = jsonDict[key]?.ToString()?.Trim();
+                var langFilePath = Path.Combine(directoryPath, $"{lang}.json");
+                FileManager.EnsureFileExists(langFilePath);
+                var langJson = FileManager.LoadJson(langFilePath);
 
-                // On considère que la valeur est valide si non null et non vide
-                if (!string.IsNullOrEmpty(value))
+                var jsonDict = (IDictionary<string, JToken?>)langJson;
+
+                foreach (var key in jsonDict.Keys)
                 {
-                    if (!translations.ContainsKey(key))
-                    {
-                        translations[key] = new HashSet<string>();
-                    }
-                    translations[key].Add(lang);
+                    var value = jsonDict[key]?.ToString()?.Trim();
 
-                    if (lang == "fr")
+                    // On considère que la valeur est valide si non null et non vide
+                    if (!string.IsNullOrEmpty(value))
                     {
-                        frValues[key] = value;
+                        if (!translations.ContainsKey(key))
+                        {
+                            translations[key] = new HashSet<string>();
+                        }
+
+                        translations[key].Add(lang);
+
+                        if (lang == "fr")
+                        {
+                            frValues[key] = value;
+                        }
                     }
+                }
+            }
+
+            var allKeys = translations.Keys.Union(frValues.Keys).Distinct();
+
+            foreach (var key in allKeys)
+            {
+                var existingLangs = translations.ContainsKey(key) ? translations[key] : new HashSet<string>();
+                var missingLanguages = Languages.Where(lang => !existingLangs.Contains(lang)).ToList();
+
+                if (missingLanguages.Any())
+                {
+                    var missingLangsStr = string.Join(";", missingLanguages);
+                    var frValue = frValues.ContainsKey(key) ? frValues[key] : "MISSING_FR";
+                    csvBuilder.AppendLine(string.Join(Separator,
+                        new[] { directoryPath, key, frValue, missingLangsStr }.Select(val => $"\"{val}\"")));
                 }
             }
         }
 
-        var allKeys = translations.Keys.Union(frValues.Keys).Distinct();
-
-        foreach (var key in allKeys)
-        {
-            var existingLangs = translations.ContainsKey(key) ? translations[key] : new HashSet<string>();
-            var missingLanguages = Languages.Where(lang => !existingLangs.Contains(lang)).ToList();
-
-            if (missingLanguages.Any())
-            {
-                var missingLangsStr = string.Join(";", missingLanguages);
-                var frValue = frValues.ContainsKey(key) ? frValues[key] : "MISSING_FR";
-                csvBuilder.AppendLine(string.Join(Separator, new[] { directoryPath, key, frValue, missingLangsStr }.Select(val => $"\"{val}\"")));
-
-            }
-        }
+        var outputFilePath = Path.Combine(_importExportPath, "missing_translations.csv");
+        await File.WriteAllTextAsync(outputFilePath, csvBuilder.ToString());
     }
-
-    var outputFilePath = Path.Combine(_importExportPath, "missing_translations.csv");
-    await File.WriteAllTextAsync(outputFilePath, csvBuilder.ToString());
-}
 
     private void CollectTranslations(JToken token, Dictionary<string, Dictionary<string, string>> translations,
         string language, string currentKey = "")
@@ -186,10 +187,17 @@ public async Task CheckMissingKeys(List<string> filesExcluded)
                     var langJson = FileManager.LoadJson(langFilePath);
                     var flattenedJson = FlattenJson(langJson);
 
-                    if (flattenedJson.ContainsKey(key))
+                    if (!string.IsNullOrWhiteSpace(translation))
                     {
+                        // Ne remplacer que si la nouvelle valeur est non vide et non null
                         flattenedJson[key] = translation;
                     }
+
+                    // else if (!flattenedJson.ContainsKey(key))
+                    // {
+                    //     // Si la clé n'existe pas encore, on peut l’ajouter (même vide)
+                    //     flattenedJson[key] = translation;
+                    // }
                     var updatedJson = JObject.FromObject(flattenedJson);
                     FileManager.SaveJson(langFilePath, updatedJson);
                 }
@@ -241,4 +249,89 @@ public async Task CheckMissingKeys(List<string> filesExcluded)
 
         return result;
     }
+
+
+    
+    public async Task FindKeysAndValues(List<string> searchTerms, List<string> filesExcluded)
+{
+    var frFiles = FileManager.GetFilesExcludingNodeModules(BasePath, "fr.json", filesExcluded);
+    var outputBuilder = new StringBuilder();
+    outputBuilder.AppendLine($"FilePath{Separator}Key{Separator}fr{Separator}en{Separator}de{Separator}es{Separator}it{Separator}nl{Separator}pt");
+
+    foreach (var frFile in frFiles)
+    {
+        var directoryPath = Path.GetDirectoryName(frFile);
+        if (string.IsNullOrEmpty(directoryPath)) continue;
+
+        // Charger les traductions de toutes les langues
+        var translations = new Dictionary<string, Dictionary<string, string>>();
+        foreach (var lang in new[] { "fr", "en", "de", "es", "it", "nl", "pt" })
+        {
+            var filePath = Path.Combine(directoryPath, $"{lang}.json");
+            if (!File.Exists(filePath)) continue;
+
+            var json = FileManager.LoadJson(filePath);
+            var flat = FlattenJson(json);
+
+            foreach (var kvp in flat)
+            {
+                if (!translations.ContainsKey(kvp.Key))
+                    translations[kvp.Key] = new Dictionary<string, string>();
+
+                translations[kvp.Key][lang] = kvp.Value;
+            }
+        }
+
+        // 🔍 Recherche : correspondance partielle dans n’importe quelle langue
+        foreach (var kvp in translations)
+        {
+            var key = kvp.Key;
+            var matchFound = false;
+            var allValues = kvp.Value;
+
+            foreach (var term in searchTerms)
+            {
+                var normalizedTerm = Normalize(term);
+                foreach (var val in allValues.Values)
+                {
+                    if (Normalize(val).Contains(normalizedTerm))
+                    {
+                        matchFound = true;
+                        break;
+                    }
+                }
+                if (matchFound) break;
+            }
+
+            if (matchFound)
+            {
+                var line = new List<string> { directoryPath, key };
+                line.AddRange(new[] { "fr", "en", "de", "es", "it", "nl", "pt" }
+                    .Select(lang => allValues.ContainsKey(lang) ? allValues[lang] : "MISSING"));
+
+                outputBuilder.AppendLine(string.Join(Separator, line.Select(v => $"\"{v}\"")));
+            }
+        }
+    }
+
+    var outputPath = Path.Combine(_importExportPath, "search_results_full.csv");
+    await File.WriteAllTextAsync(outputPath, outputBuilder.ToString());
+}
+
+private static string Normalize(string? input)
+{
+    if (string.IsNullOrWhiteSpace(input)) return string.Empty;
+    var formD = input.Normalize(NormalizationForm.FormD);
+    var sb = new StringBuilder();
+    foreach (var c in formD)
+    {
+        var unicodeCategory = CharUnicodeInfo.GetUnicodeCategory(c);
+        if (unicodeCategory != UnicodeCategory.NonSpacingMark)
+        {
+            sb.Append(char.ToLowerInvariant(c));
+        }
+    }
+    return string.Join(' ', sb.ToString().Split(' ', StringSplitOptions.RemoveEmptyEntries));
+}
+
 }

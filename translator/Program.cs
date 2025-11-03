@@ -64,6 +64,39 @@ namespace translator
                     Console.WriteLine($"Erreur lors de l'exportation des traductions : {ex.Message}");
                 }
             }
+            else if (args.Contains("--find-values") || args.Contains("-fv"))
+            {
+                var nameIndex = Array.FindIndex(args, a => a == "--name" || a == "-n");
+
+                if (nameIndex >= 0 && nameIndex < args.Length - 1)
+                {
+                    var valuesFilePath = args[nameIndex + 1];
+                    if (File.Exists(valuesFilePath))
+                    {
+                        Console.WriteLine($"Recherche des clés associées aux valeurs contenues dans : {valuesFilePath}");
+                        try
+                        {
+                            var valuesToFind = File.ReadAllLines(valuesFilePath).ToList();
+                            var excludedFiles = configuration["ExcludedFiles"]?.Split(',').ToList() ??
+                                                Array.Empty<string>().ToList();
+                            await importExportService.FindKeysAndValues(valuesToFind, excludedFiles);
+                            Console.WriteLine("Recherche terminée (résultat : matched_keys.csv)");
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"Erreur lors de la recherche des clés : {ex.Message}");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Le fichier spécifié n'existe pas : {valuesFilePath}");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("Le chemin vers un fichier contenant les valeurs FR est requis. Utilisez --name <filename>.");
+                }
+            }
             else if (args.Contains("--compare") || args.Contains("-c"))
             {
                 Console.WriteLine("compare file");
